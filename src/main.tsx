@@ -8,7 +8,7 @@ import "./style.css";
 
 type Character = { id: string; name: string; memo: string; order: number };
 type Boss = { id: string; order: number; name: string; difficulty: string; cycle: string; price: number };
-type Run = { id: string; characterId: string; bossId: string; cleared: boolean; partySize: number; overridePrice: string; memo: string };
+type Run = { id: string; characterId: string; bossId: string; cleared: boolean; vipReset?: boolean; partySize: number; overridePrice: string; memo: string };
 type AppState = { characters: Character[]; bosses: Boss[]; runs: Run[]; selectedCharacterId: string; vipExtraSlots?: number };
 
 const LOCAL_KEY = "maple-crystal-manager-firebase-v1";
@@ -94,6 +94,7 @@ function makeDefaultState(): AppState {
         characterId: c.id,
         bossId: b.id,
         cleared: false,
+        vipReset: false,
         partySize: 1,
         overridePrice: "",
         memo: "",
@@ -191,6 +192,21 @@ function App() {
   const selectedCharacter = state.characters.find((c) => c.id === state.selectedCharacterId) || state.characters[0];
   const sellLimit = SELL_LIMIT + Math.max(0, Number(state.vipExtraSlots || 0));
 
+  const vipLimit = Math.max(0, Number(state.vipExtraSlots || 0));
+
+  function isVipResetEligibleBoss(boss?: Boss) {
+    if (!boss) return false;
+    const arcaneAndBefore = [
+      "シグナス", "ヒルラ", "ピンクビーン", "ジャクム", "ピエール", "バンバン", "ブラッディクイーン",
+      "マグナス", "ベルルム", "ノウ姫", "ビシャス", "アケチミツヒデ", "スウ", "デミアン",
+      "ガーディアンエンジェルスライム", "ルシード", "ウィル", "ダスク", "デュンケル", "真ヒルラ",
+      "暗黒の魔法使い"
+    ];
+    const authenticVip = ["セレン", "カロス", "カリーン"];
+    return arcaneAndBefore.includes(boss.name) || authenticVip.includes(boss.name);
+  }
+
+
   const enrichedRuns = useMemo(() => state.runs.map((r) => {
     const boss = bossMap.get(r.bossId);
     const base = r.overridePrice !== "" ? Number(r.overridePrice) : Number(boss?.price || 0);
@@ -207,6 +223,7 @@ function App() {
   const totalIncome = summary.reduce((s, r) => s + r.income, 0);
   const totalCleared = summary.reduce((s, r) => s + r.cleared, 0);
   const totalSold = summary.reduce((s, r) => s + r.sold, 0);
+  const totalVipReset = enrichedRuns.filter((r) => r.cleared && r.vipReset).length;
 
   const sellSet = useMemo(() => new Set(
     enrichedRuns
@@ -225,6 +242,10 @@ function App() {
     return runs.filter((r) => r.characterId === characterId && r.cleared).length;
   }
 
+  function getVipCountForCharacter(runs: Run[], characterId: string) {
+    return runs.filter((r) => r.characterId === characterId && r.cleared && r.vipReset).length;
+  }
+
   function hasSameBossChecked(runs: Run[], targetRun: Run, nextBossId?: string) {
     const targetBoss = bossMap.get(nextBossId || targetRun.bossId);
     if (!targetBoss) return false;
@@ -235,34 +256,75 @@ function App() {
     });
   }
 
+  function toggleRunCleared(id: string) {
+    const target = state.runs.find((r) => r.id === id);
+    if (!target) return;
+    setRun(id, { cleared: !target.cleared, vipReset: target.cleared ? false : target.vipReset });
+  }
+
+  function toggleVipReset(id: string) {
+    const target = state.runs.find((r) => r.id === id);
+    if (!target) return;
+    const boss = bossMap.get(target.bossId);
+    if (!isVipResetEligibleBoss(boss)) {
+      alert("このボスはVIPリセット対象外です。対象はアーケインまでのボス全部と、オーセンティックはセレン・カロス・カリーンまでです。");
+      return;
+    }
+    if (!target.cleared) {
+      alert("先にボスを選択してください。");
+      return;
+    }
+    if (!target.vipReset && getVipCountForCharacter(state.runs, target.characterId) >= vipLimit) {
+      alert(`VIP追加枠は最大 ${vipLimit} 枠までです。設定タブで変更できます。`);
+      return;
+    }
+    setRun(id, { vipReset: !target.vipReset });
+  }
+
   function setRun(id: string, patch: Partial<Run>) {
     const target = state.runs.find((r) => r.id === id);
     if (!target) return;
 
     const wantsCheck = patch.cleared === true && !target.cleared;
+    const wantsVip = patch.vipReset === true && !target.vipReset;
     const nextBossId = patch.bossId || target.bossId;
-    const nextRunsPreview = state.runs.map((r) => r.id === id ? { ...r, ...patch, bossId: nextBossId } : r);
+    const nextCleared = patch.cleared ?? target.cleared;
+    const nextVipReset = patch.vipReset ?? target.vipReset;
+    const nextBoss = bossMap.get(nextBossId);
 
     if (wantsCheck) {
       const currentCount = getCheckedCountForCharacter(state.runs, target.characterId);
       if (currentCount >= sellLimit) {
-        alert(`このキャラは最大 ${sellLimit} 体まで選択できます。VIP追加枠は設定タブで変更できます。`);
+        alert(`このキャラは最大 ${sellLimit} 体まで選択できます。通常12体 + VIP追加枠です。`);
         return;
       }
       if (hasSameBossChecked(state.runs, { ...target, bossId: nextBossId }, nextBossId)) {
-        const boss = bossMap.get(nextBossId);
-        alert(`${boss?.name || "同じボス"}は別難易度をすでに選択しています。同じボスは1難易度だけ選択できます。`);
+        alert(`${nextBoss?.name || "同じボス"}は別難易度をすでに選択しています。同じボスは1難易度だけ選択できます。`);
         return;
       }
     }
 
     if (target.cleared && patch.bossId && hasSameBossChecked(state.runs, { ...target, bossId: patch.bossId }, patch.bossId)) {
-      const boss = bossMap.get(patch.bossId);
-      alert(`${boss?.name || "同じボス"}は別難易度をすでに選択しています。同じボスは1難易度だけ選択できます。`);
+      alert(`${nextBoss?.name || "同じボス"}は別難易度をすでに選択しています。同じボスは1難易度だけ選択できます。`);
       return;
     }
 
-    updateState((s) => ({ ...s, runs: s.runs.map((r) => r.id === id ? { ...r, ...patch } : r) }));
+    if (nextVipReset) {
+      if (!isVipResetEligibleBoss(nextBoss)) {
+        alert("このボスはVIPリセット対象外です。対象はアーケインまでのボス全部と、オーセンティックはセレン・カロス・カリーンまでです。");
+        return;
+      }
+      if (!nextCleared) {
+        alert("VIPリセットを使う場合は、先にボスを選択してください。");
+        return;
+      }
+      if (wantsVip && getVipCountForCharacter(state.runs, target.characterId) >= vipLimit) {
+        alert(`VIP追加枠は最大 ${vipLimit} 枠までです。`);
+        return;
+      }
+    }
+
+    updateState((s) => ({ ...s, runs: s.runs.map((r) => r.id === id ? { ...r, ...patch, vipReset: nextCleared ? nextVipReset : false } : r) }));
   }
 
   function setBoss(id: string, patch: Partial<Boss>) {
@@ -276,7 +338,7 @@ function App() {
   function addCharacter() {
     updateState((s) => {
       const c = { id: uid(), name: `キャラ${s.characters.length + 1}`, memo: "", order: s.characters.length + 1 };
-      const runs = s.bosses.filter((b) => b.cycle !== "日").map((b) => ({ id: uid(), characterId: c.id, bossId: b.id, cleared: false, partySize: 1, overridePrice: "", memo: "" }));
+      const runs = s.bosses.filter((b) => b.cycle !== "日").map((b) => ({ id: uid(), characterId: c.id, bossId: b.id, cleared: false, vipReset: false, partySize: 1, overridePrice: "", memo: "" }));
       return { ...s, characters: [...s.characters, c], runs: [...s.runs, ...runs], selectedCharacterId: c.id };
     });
   }
@@ -299,12 +361,12 @@ function App() {
 
   function addRun() {
     const boss = state.bosses.find((b) => b.cycle !== "日") || state.bosses[0];
-    updateState((s) => ({ ...s, runs: [...s.runs, { id: uid(), characterId: selectedCharacter.id, bossId: boss.id, cleared: false, partySize: 1, overridePrice: "", memo: "" }] }));
+    updateState((s) => ({ ...s, runs: [...s.runs, { id: uid(), characterId: selectedCharacter.id, bossId: boss.id, cleared: false, vipReset: false, partySize: 1, overridePrice: "", memo: "" }] }));
   }
 
   function resetWeek() {
     if (!confirm("全キャラの討伐チェックを外しますか？")) return;
-    updateState((s) => ({ ...s, runs: s.runs.map((r) => ({ ...r, cleared: false })) }));
+    updateState((s) => ({ ...s, runs: s.runs.map((r) => ({ ...r, cleared: false, vipReset: false })) }));
   }
 
   function resetBosses() {
@@ -483,7 +545,7 @@ function App() {
             <em>売却対象のみ</em>
           </div>
           <div className="revenueValue">{yen(totalIncome)}</div>
-          <div className="revenueSub">売却対象：{totalSold} / {state.characters.length * sellLimit}</div>
+          <div className="revenueSub">売却対象：{totalSold} / {state.characters.length * sellLimit}　VIP：{totalVipReset}</div>
         </div>
         <div className="actionPanel">
           <button className="wideBlue" onClick={forceSave}>精算を実行する</button>
@@ -522,31 +584,94 @@ function App() {
       )}
 
       {tab === "runs" && (
-        <main className="panel">
-          <div className="toolbar">
-            <select value={selectedCharacter?.id} onChange={(e) => updateState((s) => ({ ...s, selectedCharacterId: e.target.value }))}>
-              {state.characters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <input placeholder="ボス検索" value={search} onChange={(e) => setSearch(e.target.value)} />
-            <span className="badge">選択 {enrichedRuns.filter((r) => r.characterId === selectedCharacter?.id && r.cleared).length}/{sellLimit}</span>
-            <button className="primary" onClick={addRun}><Plus size={16} />追加</button>
-          </div>
-          <div className="runList">
-            {shownRuns.map((r) => (
-              <div key={r.id} className="runCard">
-                <label className="check"><input type="checkbox" checked={r.cleared} disabled={!r.cleared && enrichedRuns.filter((x) => x.characterId === selectedCharacter?.id && x.cleared).length >= sellLimit} onChange={(e) => setRun(r.id, { cleared: e.target.checked })} /><strong>{bossLabel(r.boss)}</strong></label>
-                <span className={r.cleared && sellSet.has(r.id) ? "badge sell" : "badge"}>{r.cleared && sellSet.has(r.id) ? "売却対象" : "除外"}</span>
-                <select value={r.bossId} onChange={(e) => setRun(r.id, { bossId: e.target.value })}>
-                  {state.bosses.map((b) => <option key={b.id} value={b.id} disabled={r.bossId !== b.id && enrichedRuns.some((x) => x.characterId === selectedCharacter?.id && x.id !== r.id && x.cleared && bossMap.get(x.bossId)?.name === b.name)}>{bossLabel(b)}</option>)}
-                </select>
-                <label>PT人数<input type="number" min={1} value={r.partySize} onChange={(e) => setRun(r.id, { partySize: Math.max(1, Number(e.target.value || 1)) })} /></label>
-                <label>上書き価格<input type="number" placeholder="空欄でマスタ" value={r.overridePrice} onChange={(e) => setRun(r.id, { overridePrice: e.target.value })} /></label>
-                <div className="share"><span>取り分</span><b>{yen(r.share)}</b></div>
-                <input placeholder="メモ" value={r.memo} onChange={(e) => setRun(r.id, { memo: e.target.value })} />
-                <button className="danger" onClick={() => updateState((s) => ({ ...s, runs: s.runs.filter((x) => x.id !== r.id) }))}><Trash2 size={16} /></button>
+        <main className="checkLayout">
+          <aside className="charSidebar">
+            {state.characters.map((c) => {
+              const checked = enrichedRuns.filter((r) => r.characterId === c.id && r.cleared).length;
+              const vip = enrichedRuns.filter((r) => r.characterId === c.id && r.cleared && r.vipReset).length;
+              return (
+                <button
+                  key={c.id}
+                  className={`sideChar ${c.id === selectedCharacter?.id ? "active" : ""}`}
+                  onClick={() => updateState((s) => ({ ...s, selectedCharacterId: c.id }))}
+                >
+                  <span className="sideAvatar">{c.name.slice(0, 2)}</span>
+                  <span>
+                    <b>{c.name}</b>
+                    <em>{checked}体選択中 / VIP {vip}/{vipLimit}</em>
+                  </span>
+                </button>
+              );
+            })}
+          </aside>
+
+          <section className="bossPicker">
+            <div className="pickerHeader">
+              <div>
+                <h2>{selectedCharacter?.name}</h2>
+                <p>同じボスは1難易度だけ選択できます。VIP対象ボスは名前の右側にVIPボタンが出ます。</p>
               </div>
-            ))}
-          </div>
+              <div className="pickerActions">
+                <span className="badge">選択 {enrichedRuns.filter((r) => r.characterId === selectedCharacter?.id && r.cleared).length}/{sellLimit}</span>
+                <span className="badge vipBadge">VIP {enrichedRuns.filter((r) => r.characterId === selectedCharacter?.id && r.cleared && r.vipReset).length}/{vipLimit}</span>
+                <input className="pickerSearch" placeholder="ボス検索" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="presetRow">
+              <button onClick={() => updateState((s) => ({...s, runs: s.runs.map((r) => r.characterId === selectedCharacter?.id ? {...r, cleared:false, vipReset:false} : r)}))}>全解除</button>
+              <button onClick={() => {
+                const candidates = enrichedRuns
+                  .filter((r) => r.characterId === selectedCharacter?.id)
+                  .sort((a, b) => Number(b.boss?.price || 0) - Number(a.boss?.price || 0));
+                const used = new Set<string>();
+                const ids = new Set<string>();
+                candidates.forEach((r) => {
+                  const name = r.boss?.name || "";
+                  if (ids.size >= sellLimit || used.has(name)) return;
+                  used.add(name);
+                  ids.add(r.id);
+                });
+                updateState((s) => ({...s, runs: s.runs.map((r) => r.characterId === selectedCharacter?.id ? {...r, cleared: ids.has(r.id), vipReset:false} : r)}));
+              }}>高額順セット</button>
+              <span className="presetHint">※ VIPリセット分は各ボスカード右側のVIPで指定</span>
+            </div>
+
+            <div className="weeklyTitle">● WEEKLY / MONTHLY BOSSES</div>
+            <div className="bossCardGrid">
+              {shownRuns.map((r) => {
+                const sameBossSelected = enrichedRuns.some((x) => x.characterId === selectedCharacter?.id && x.id !== r.id && x.cleared && bossMap.get(x.bossId)?.name === r.boss?.name);
+                const maxed = !r.cleared && enrichedRuns.filter((x) => x.characterId === selectedCharacter?.id && x.cleared).length >= sellLimit;
+                const vipEligible = isVipResetEligibleBoss(r.boss);
+                return (
+                  <div
+                    key={r.id}
+                    className={`selectBossCard ${r.cleared ? "checked" : ""} ${r.vipReset ? "vipSelected" : ""} ${sameBossSelected ? "disabledBySame" : ""}`}
+                    onClick={() => !sameBossSelected && !maxed && toggleRunCleared(r.id)}
+                  >
+                    <div className="bossCardTop">
+                      <span className={`fakeCheck ${r.cleared ? "on" : ""}`}>{r.cleared ? "✓" : ""}</span>
+                      <div className="bossTitleWrap">
+                        <strong>{r.boss?.difficulty?.slice(0, 1)} {r.boss?.name}</strong>
+                        <em>{yen(r.share)}</em>
+                      </div>
+                      {vipEligible && (
+                        <button
+                          className={`vipToggle ${r.vipReset ? "on" : ""}`}
+                          onClick={(e) => { e.stopPropagation(); toggleVipReset(r.id); }}
+                          title="VIPリセット"
+                        >
+                          ♕ VIP
+                        </button>
+                      )}
+                    </div>
+                    {sameBossSelected && <div className="cardNote">同ボス選択済み</div>}
+                    {maxed && !r.cleared && <div className="cardNote">上限</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </main>
       )}
 
@@ -596,7 +721,7 @@ function App() {
           <div className="limitBox">
             <div>
               <h2>売却枠設定</h2>
-              <p>通常12体に、VIP追加分を足した数まで選択できます。同じボスの別難易度は同時に選択できません。</p>
+              <p>通常12体にVIP追加枠を足した数まで選択できます。VIPリセット対象は、アーケインまでのボス全部とセレン・カロス・カリーンまでです。同じボスの別難易度は同時に選択できません。</p>
             </div>
             <label className="selectLabel">VIP追加枠
               <input type="number" min={0} max={20} value={state.vipExtraSlots || 0} onChange={(e) => updateState((s) => ({ ...s, vipExtraSlots: Math.max(0, Number(e.target.value || 0)) }))} />
