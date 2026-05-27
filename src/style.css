@@ -1,0 +1,60 @@
+:root{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  color:#101828;background:#f6f7fb;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#f6f7fb}
+button,input,select{font:inherit}
+.app{max-width:1180px;margin:0 auto;padding:18px 14px 100px}
+.hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;margin:8px 0 16px}
+h1{font-size:clamp(30px,6vw,56px);letter-spacing:-.05em;line-height:1;margin:.2em 0}
+p{color:#667085;margin:.4em 0}
+.pill,.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;background:#eef2ff;color:#1e3a8a;font-weight:800;padding:6px 10px;font-size:12px}
+.badge.ok{background:#dcfce7;color:#166534}
+.badge.sell{background:#dbeafe;color:#1d4ed8}
+.badge.warn{background:#fef3c7;color:#92400e}
+.actions,.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{border:0;border-radius:14px;padding:10px 12px;background:white;color:#344054;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:0 1px 0 rgba(16,24,40,.05)}
+button.primary{background:#2563eb;color:white}
+button.ghost{background:white}
+button.danger{background:#fee2e2;color:#991b1b}
+input,select{width:100%;border:1px solid #e5e7eb;border-radius:14px;background:white;padding:10px 11px;min-height:42px}
+input[type=checkbox]{width:22px;height:22px;min-height:22px;accent-color:#2563eb}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+.card,.panel,.charCard,.runCard{background:white;border:1px solid #e5e7eb;border-radius:20px;box-shadow:0 10px 28px rgba(16,24,40,.08)}
+.card{padding:15px}
+.card span{display:block;color:#667085;font-size:12px}
+.card b{display:block;font-size:22px;margin-top:6px}
+.tabs{position:sticky;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:rgba(246,247,251,.88);backdrop-filter:blur(10px);padding:8px 0;margin:12px 0}
+.tabs button.active{background:#2563eb;color:white}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.charCard{text-align:left;padding:16px}
+.charCard.selected{outline:3px solid #dbeafe;border-color:#93c5fd}
+.charTop{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.charTop strong{font-size:22px}
+.income{font-size:24px;font-weight:900;margin:12px 0}
+.mini{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mini span{border-radius:14px;background:#f9fafb;padding:10px;color:#475467;font-weight:800}
+.panel{padding:14px}
+.runList{display:grid;gap:10px;margin-top:12px}
+.runCard{display:grid;grid-template-columns:1.4fr 92px 1.6fr .7fr 1fr 1fr 1fr 44px;gap:8px;align-items:center;padding:10px;box-shadow:none}
+.check{display:flex;align-items:center;gap:9px}
+.share span{display:block;color:#667085;font-size:12px}.share b{display:block}
+.bossList,.settingsList{display:grid;gap:8px;margin-top:12px}
+.bossRow{display:grid;grid-template-columns:70px 1.5fr .8fr 90px 1fr;gap:8px}
+.settingRow{display:grid;grid-template-columns:80px 1fr 1fr 96px;gap:8px;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px}
+.settingRow span{font-weight:800;color:#667085}
+.note{margin-top:14px;border-left:4px solid #2563eb;background:#eff6ff;color:#1e3a8a;border-radius:14px;padding:12px;line-height:1.6}
+@media(max-width:860px){
+  .hero{display:block}
+  .actions{margin-top:12px}
+  .stats{grid-template-columns:1fr 1fr}
+  .grid{grid-template-columns:1fr}
+  .runCard{grid-template-columns:1fr 86px}
+  .runCard select,.runCard label,.runCard .share,.runCard input:not([type=checkbox]){grid-column:1/-1}
+  .bossRow{grid-template-columns:54px 1fr 90px}
+  .bossRow input:nth-child(5){grid-column:1/-1}
+  .settingRow{grid-template-columns:1fr}
+  .tabs{gap:5px}
+  .tabs button{font-size:12px;padding:10px 4px;justify-content:center}
+}
