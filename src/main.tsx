@@ -117,23 +117,62 @@ function bossLabel(b?: Boss) {
 }
 
 function migrate(s: AppState): AppState {
-  const bosses = [...(s.bosses || [])];
-  const seedMap = new Map(bossSeed.map((seed, i) => [`${seed[0]}|${seed[1]}`, { seed, order: i + 1 }]));
-  const existing = new Set(bosses.map((b) => `${b.name}|${b.difficulty}`));
+  const oldBosses = s.bosses || [];
+  const oldBossByKey = new Map(oldBosses.map((boss) => [`${boss.name}|${boss.difficulty}`, boss]));
+  const oldIdByKey = new Map(oldBosses.map((boss) => [`${boss.name}|${boss.difficulty}`, boss.id]));
+
+  const bosses = bossSeed.map((seed, i) => {
+    const old = oldBossByKey.get(`${seed[0]}|${seed[1]}`);
+    return {
+      id: old?.id || uid(),
+      order: i + 1,
+      name: seed[0],
+      difficulty: seed[1],
+      cycle: seed[2],
+      price: seed[3],
+    };
+  });
+
+  const newIdByOldId = new Map<string, string>();
   bosses.forEach((boss) => {
-    const found = seedMap.get(`${boss.name}|${boss.difficulty}`);
-    if (found) {
-      boss.order = found.order;
-      boss.cycle = found.seed[2];
-      if (!boss.price || boss.price === 0) boss.price = found.seed[3];
-    }
+    const oldId = oldIdByKey.get(`${boss.name}|${boss.difficulty}`);
+    if (oldId) newIdByOldId.set(oldId, boss.id);
   });
-  bossSeed.forEach((seed, i) => {
-    const key = `${seed[0]}|${seed[1]}`;
-    if (!existing.has(key)) bosses.push({ id: uid(), order: i + 1, name: seed[0], difficulty: seed[1], cycle: seed[2], price: seed[3] });
+
+  const validBossIds = new Set(bosses.map((boss) => boss.id));
+  const runs: Run[] = (s.runs || [])
+    .map((run) => ({ ...run, bossId: newIdByOldId.get(run.bossId) || run.bossId }))
+    .filter((run) => validBossIds.has(run.bossId));
+
+  const runKeys = new Set(runs.map((run) => `${run.characterId}|${run.bossId}`));
+  (s.characters || []).forEach((character) => {
+    bosses.forEach((boss) => {
+      const key = `${character.id}|${boss.id}`;
+      if (!runKeys.has(key)) {
+        runs.push({
+          id: uid(),
+          characterId: character.id,
+          bossId: boss.id,
+          cleared: false,
+          vipReset: false,
+          partySize: 1,
+          overridePrice: "",
+          memo: "",
+        });
+        runKeys.add(key);
+      }
+    });
   });
-  bosses.sort((a, b) => (a.order || 9999) - (b.order || 9999));
-  return { ...s, bosses, selectedCharacterId: s.selectedCharacterId || s.characters[0]?.id, vipExtraSlots: Number(s.vipExtraSlots || 0), vipRank: s.vipRank || "royal_weekly", settlements: s.settlements || [] };
+
+  return {
+    ...s,
+    bosses,
+    runs,
+    selectedCharacterId: s.selectedCharacterId || s.characters[0]?.id,
+    vipExtraSlots: Number(s.vipExtraSlots || 0),
+    vipRank: s.vipRank || "royal_weekly",
+    settlements: s.settlements || [],
+  };
 }
 
 function App() {
@@ -271,7 +310,6 @@ function App() {
   const maxCharacterIncome = Math.max(1, ...statRows.map((r) => r.income));
   const estimatedMonth4 = totalIncome * 4;
   const estimatedMonth5 = totalIncome * 5;
-  const totalVipReset = enrichedRuns.filter((r) => r.cleared && r.vipReset).length;
 
   const sellSet = useMemo(() => new Set(
     enrichedRuns
