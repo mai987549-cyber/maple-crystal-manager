@@ -9,7 +9,8 @@ import "./style.css";
 type Character = { id: string; name: string; memo: string; order: number };
 type Boss = { id: string; order: number; name: string; difficulty: string; cycle: string; price: number };
 type Run = { id: string; characterId: string; bossId: string; cleared: boolean; vipReset?: boolean; partySize: number; overridePrice: string; memo: string };
-type AppState = { characters: Character[]; bosses: Boss[]; runs: Run[]; selectedCharacterId: string; vipExtraSlots?: number };
+type Settlement = { id: string; createdAt: number; totalIncome: number; totalCrystals: number; characterSummaries: { characterId: string; name: string; income: number; crystals: number; vip: number }[] };
+type AppState = { characters: Character[]; bosses: Boss[]; runs: Run[]; selectedCharacterId: string; vipExtraSlots?: number; vipRank?: string; settlements?: Settlement[] };
 
 const LOCAL_KEY = "maple-crystal-manager-firebase-v1";
 const SELL_LIMIT = 12;
@@ -102,6 +103,8 @@ function makeDefaultState(): AppState {
     ),
     selectedCharacterId: characters[0].id,
     vipExtraSlots: 0,
+    vipRank: "royal_weekly",
+    settlements: [],
   };
 }
 
@@ -130,7 +133,7 @@ function migrate(s: AppState): AppState {
     if (!existing.has(key)) bosses.push({ id: uid(), order: i + 1, name: seed[0], difficulty: seed[1], cycle: seed[2], price: seed[3] });
   });
   bosses.sort((a, b) => (a.order || 9999) - (b.order || 9999));
-  return { ...s, bosses, selectedCharacterId: s.selectedCharacterId || s.characters[0]?.id, vipExtraSlots: Number(s.vipExtraSlots || 0) };
+  return { ...s, bosses, selectedCharacterId: s.selectedCharacterId || s.characters[0]?.id, vipExtraSlots: Number(s.vipExtraSlots || 0), vipRank: s.vipRank || "royal_weekly", settlements: s.settlements || [] };
 }
 
 function App() {
@@ -190,12 +193,41 @@ function App() {
 
   const bossMap = useMemo(() => new Map(state.bosses.map((b) => [b.id, b])), [state.bosses]);
   const selectedCharacter = state.characters.find((c) => c.id === state.selectedCharacterId) || state.characters[0];
-  const sellLimit = SELL_LIMIT + Math.max(0, Number(state.vipExtraSlots || 0));
 
-  const vipLimit = Math.max(0, Number(state.vipExtraSlots || 0));
+  function shortDifficulty(difficulty?: string) {
+    if (!difficulty) return "";
+    if (difficulty === "Extreme") return "EX";
+    if (difficulty === "Chaos") return "C";
+    if (difficulty === "Hard") return "H";
+    if (difficulty === "Normal") return "N";
+    if (difficulty === "Easy") return "E";
+    return difficulty;
+  }
+
+  function bossCardName(boss?: Boss) {
+    if (!boss) return "未選択";
+    return `${shortDifficulty(boss.difficulty)} ${boss.name}`;
+  }
+
+  const vipRankOptions = [
+    { value: "none", label: "なし", resets: 0 },
+    { value: "diamond_weekly", label: "ダイヤ（週1）", resets: 1 },
+    { value: "platinum_weekly", label: "プラチナ（週2）", resets: 2 },
+    { value: "royal_weekly", label: "ロイヤル（週3/月1）", resets: 3 },
+    { value: "custom", label: "カスタム", resets: Math.max(0, Number(state.vipExtraSlots || 0)) },
+  ];
+
+  function getVipRankResetCount(rank = state.vipRank || "royal_weekly") {
+    const found = vipRankOptions.find((x) => x.value === rank);
+    return found ? found.resets : 0;
+  }
+
+  const vipLimit = getVipRankResetCount();
+  const sellLimit = SELL_LIMIT + vipLimit;
 
   function isVipResetEligibleBoss(boss?: Boss) {
     if (!boss) return false;
+    if (boss.difficulty === "Extreme") return false;
     const arcaneAndBefore = [
       "シグナス", "ヒルラ", "ピンクビーン", "ジャクム", "ピエール", "バンバン", "ブラッディクイーン",
       "マグナス", "ベルルム", "ノウ姫", "ビシャス", "アケチミツヒデ", "スウ", "デミアン",
@@ -223,6 +255,22 @@ function App() {
   const totalIncome = summary.reduce((s, r) => s + r.income, 0);
   const totalCleared = summary.reduce((s, r) => s + r.cleared, 0);
   const totalSold = summary.reduce((s, r) => s + r.sold, 0);
+  const totalVipReset = enrichedRuns.filter((r) => r.cleared && r.vipReset).length;
+
+  const statRows = useMemo(() => {
+    return state.characters
+      .map((character) => {
+        const selected = enrichedRuns.filter((r) => r.characterId === character.id && r.cleared);
+        const income = selected.reduce((sum, r) => sum + r.share, 0);
+        const vipCount = selected.filter((r) => r.vipReset).length;
+        return { character, selectedCount: selected.length, vipCount, income };
+      })
+      .sort((a, b) => b.income - a.income);
+  }, [state.characters, enrichedRuns]);
+
+  const maxCharacterIncome = Math.max(1, ...statRows.map((r) => r.income));
+  const estimatedMonth4 = totalIncome * 4;
+  const estimatedMonth5 = totalIncome * 5;
   const totalVipReset = enrichedRuns.filter((r) => r.cleared && r.vipReset).length;
 
   const sellSet = useMemo(() => new Set(
@@ -267,7 +315,7 @@ function App() {
     if (!target) return;
     const boss = bossMap.get(target.bossId);
     if (!isVipResetEligibleBoss(boss)) {
-      alert("このボスはVIPリセット対象外です。対象はアーケインまでのボス全部と、オーセンティックはセレン・カロス・カリーンまでです。");
+      alert("このボスはVIPリセット対象外です。対象はアーケインまでの非EXボス全部と、オーセンティックはセレン・カロス・カリーンの非EXまでです。EXは対象外です。");
       return;
     }
     if (!target.cleared) {
@@ -275,7 +323,7 @@ function App() {
       return;
     }
     if (!target.vipReset && getVipCountForCharacter(state.runs, target.characterId) >= vipLimit) {
-      alert(`VIP追加枠は最大 ${vipLimit} 枠までです。設定タブで変更できます。`);
+      alert(`VIPリセット枠は最大 ${vipLimit} 枠までです。上部のVIPランクから変更できます。`);
       return;
     }
     setRun(id, { vipReset: !target.vipReset });
@@ -295,7 +343,7 @@ function App() {
     if (wantsCheck) {
       const currentCount = getCheckedCountForCharacter(state.runs, target.characterId);
       if (currentCount >= sellLimit) {
-        alert(`このキャラは最大 ${sellLimit} 体まで選択できます。通常12体 + VIP追加枠です。`);
+        alert(`このキャラは最大 ${sellLimit} 体まで選択できます。通常12体 + VIPリセット枠です。`);
         return;
       }
       if (hasSameBossChecked(state.runs, { ...target, bossId: nextBossId }, nextBossId)) {
@@ -311,7 +359,7 @@ function App() {
 
     if (nextVipReset) {
       if (!isVipResetEligibleBoss(nextBoss)) {
-        alert("このボスはVIPリセット対象外です。対象はアーケインまでのボス全部と、オーセンティックはセレン・カロス・カリーンまでです。");
+        alert("このボスはVIPリセット対象外です。対象はアーケインまでの非EXボス全部と、オーセンティックはセレン・カロス・カリーンの非EXまでです。EXは対象外です。");
         return;
       }
       if (!nextCleared) {
@@ -319,7 +367,7 @@ function App() {
         return;
       }
       if (wantsVip && getVipCountForCharacter(state.runs, target.characterId) >= vipLimit) {
-        alert(`VIP追加枠は最大 ${vipLimit} 枠までです。`);
+        alert(`VIPリセット枠は最大 ${vipLimit} 枠までです。`);
         return;
       }
     }
@@ -381,6 +429,36 @@ function App() {
     await saveCloud();
     alert("保存しました");
   }
+
+  function settleNow() {
+    const rows = state.characters.map((character) => {
+      const selected = enrichedRuns.filter((r) => r.characterId === character.id && r.cleared);
+      return {
+        characterId: character.id,
+        name: character.name,
+        income: selected.reduce((sum, r) => sum + r.share, 0),
+        crystals: selected.length,
+        vip: selected.filter((r) => r.vipReset).length,
+      };
+    }).filter((row) => row.crystals > 0);
+
+    if (rows.length === 0) {
+      alert("精算する結晶がありません。");
+      return;
+    }
+
+    const settlement: Settlement = {
+      id: uid(),
+      createdAt: Date.now(),
+      totalIncome: rows.reduce((sum, row) => sum + row.income, 0),
+      totalCrystals: rows.reduce((sum, row) => sum + row.crystals, 0),
+      characterSummaries: rows,
+    };
+
+    updateState((s) => ({ ...s, settlements: [settlement, ...(s.settlements || [])].slice(0, 50) }));
+    alert(`精算履歴を保存しました：${yen(settlement.totalIncome)}`);
+  }
+
 
   function normalizeBossName(name: string) {
     const map: Record<string, string> = {
@@ -516,8 +594,10 @@ function App() {
           <strong>ボス結晶管理</strong>
         </div>
         <div className="topActions">
-          <span className="topChip">VIPランク：ロイヤル</span>
-          <span className="topChip">リセット使用：3/3</span>
+          <select className="vipRankSelect" value={state.vipRank || "royal_weekly"} onChange={(e) => updateState((s) => ({ ...s, vipRank: e.target.value, vipExtraSlots: e.target.value === "custom" ? s.vipExtraSlots : getVipRankResetCount(e.target.value) }))}>
+            {vipRankOptions.map((rank) => <option key={rank.value} value={rank.value}>VIPランク：{rank.label}</option>)}
+          </select>
+          <span className="topChip">リセット使用：{totalVipReset}/{vipLimit}</span>
           {firebaseReady ? user ? (
             <>
               <button className="topButton" onClick={forceSave}><Save size={15} />{saving ? "保存中" : "保存"}</button>
@@ -548,7 +628,7 @@ function App() {
           <div className="revenueSub">売却対象：{totalSold} / {state.characters.length * sellLimit}　VIP：{totalVipReset}</div>
         </div>
         <div className="actionPanel">
-          <button className="wideBlue" onClick={forceSave}>精算を実行する</button>
+          <button className="wideBlue" onClick={settleNow}>精算を実行する</button>
           <button className="widePale" onClick={resetWeek}>週リセット</button>
           <div className="syncLine">同期状態：{user ? (loadedCloud ? "ON" : "読込中") : "OFF"}</div>
         </div>
@@ -609,32 +689,28 @@ function App() {
             <div className="pickerHeader">
               <div>
                 <h2>{selectedCharacter?.name}</h2>
-                <p>同じボスは1難易度だけ選択できます。VIP対象ボスは名前の右側にVIPボタンが出ます。</p>
+                <p>ボスカードをクリックで選択。人数はカード内で変更できます。同じボスは1難易度だけ選択可能。</p>
               </div>
               <div className="pickerActions">
                 <span className="badge">選択 {enrichedRuns.filter((r) => r.characterId === selectedCharacter?.id && r.cleared).length}/{sellLimit}</span>
                 <span className="badge vipBadge">VIP {enrichedRuns.filter((r) => r.characterId === selectedCharacter?.id && r.cleared && r.vipReset).length}/{vipLimit}</span>
                 <input className="pickerSearch" placeholder="ボス検索" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <button onClick={() => {
+                  const candidates = enrichedRuns
+                    .filter((r) => r.characterId === selectedCharacter?.id)
+                    .sort((a, b) => Number(b.boss?.price || 0) - Number(a.boss?.price || 0));
+                  const used = new Set<string>();
+                  const ids = new Set<string>();
+                  candidates.forEach((r) => {
+                    const name = r.boss?.name || "";
+                    if (ids.size >= sellLimit || used.has(name)) return;
+                    used.add(name);
+                    ids.add(r.id);
+                  });
+                  updateState((s) => ({...s, runs: s.runs.map((r) => r.characterId === selectedCharacter?.id ? {...r, cleared: ids.has(r.id), vipReset:false} : r)}));
+                }}>全選択</button>
+                <button onClick={() => updateState((s) => ({...s, runs: s.runs.map((r) => r.characterId === selectedCharacter?.id ? {...r, cleared:false, vipReset:false} : r)}))}>全解除</button>
               </div>
-            </div>
-
-            <div className="presetRow">
-              <button onClick={() => updateState((s) => ({...s, runs: s.runs.map((r) => r.characterId === selectedCharacter?.id ? {...r, cleared:false, vipReset:false} : r)}))}>全解除</button>
-              <button onClick={() => {
-                const candidates = enrichedRuns
-                  .filter((r) => r.characterId === selectedCharacter?.id)
-                  .sort((a, b) => Number(b.boss?.price || 0) - Number(a.boss?.price || 0));
-                const used = new Set<string>();
-                const ids = new Set<string>();
-                candidates.forEach((r) => {
-                  const name = r.boss?.name || "";
-                  if (ids.size >= sellLimit || used.has(name)) return;
-                  used.add(name);
-                  ids.add(r.id);
-                });
-                updateState((s) => ({...s, runs: s.runs.map((r) => r.characterId === selectedCharacter?.id ? {...r, cleared: ids.has(r.id), vipReset:false} : r)}));
-              }}>高額順セット</button>
-              <span className="presetHint">※ VIPリセット分は各ボスカード右側のVIPで指定</span>
             </div>
 
             <div className="weeklyTitle">● WEEKLY / MONTHLY BOSSES</div>
@@ -652,7 +728,7 @@ function App() {
                     <div className="bossCardTop">
                       <span className={`fakeCheck ${r.cleared ? "on" : ""}`}>{r.cleared ? "✓" : ""}</span>
                       <div className="bossTitleWrap">
-                        <strong>{r.boss?.difficulty?.slice(0, 1)} {r.boss?.name}</strong>
+                        <strong>{bossCardName(r.boss)}</strong>
                         <em>{yen(r.share)}</em>
                       </div>
                       {vipEligible && (
@@ -665,6 +741,12 @@ function App() {
                         </button>
                       )}
                     </div>
+                    <div className="partyLine" onClick={(e) => e.stopPropagation()}>
+                      <span>人数</span>
+                      <select value={r.partySize} onChange={(e) => setRun(r.id, { partySize: Math.max(1, Number(e.target.value || 1)) })}>
+                        {[1,2,3,4,5,6].map((n) => <option key={n} value={n}>{n}人</option>)}
+                      </select>
+                    </div>
                     {sameBossSelected && <div className="cardNote">同ボス選択済み</div>}
                     {maxed && !r.cleared && <div className="cardNote">上限</div>}
                   </div>
@@ -676,19 +758,148 @@ function App() {
       )}
 
       {tab === "bosses" && (
-        <main className="panel">
-          <div className="toolbar"><button className="ghost" onClick={resetBosses}>ボス一覧を初期化</button></div>
-          <div className="bossList">
-            {state.bosses.map((b) => (
-              <div className="bossRow" key={b.id}>
-                <input type="number" value={b.order} onChange={(e) => setBoss(b.id, { order: Number(e.target.value || 0) })} />
-                <input value={b.name} onChange={(e) => setBoss(b.id, { name: e.target.value })} />
-                <input value={b.difficulty} onChange={(e) => setBoss(b.id, { difficulty: e.target.value })} />
-                <select value={b.cycle} onChange={(e) => setBoss(b.id, { cycle: e.target.value })}><option>日</option><option>週</option><option>月</option></select>
-                <input type="number" value={b.price} onChange={(e) => setBoss(b.id, { price: Number(e.target.value || 0) })} />
+        <main className="reportPage">
+          <div className="reportPageTitle">
+            <span className="hamburger">☰</span>
+            <h2>統計レポート</h2>
+          </div>
+
+          <section className="reportHero">
+            <div className="reportFilters">
+              <div className="quickShow">
+                <span>クイック表示：</span>
+                <button className="active">全表示</button>
+                <button>今週</button>
+                <button>今月</button>
+                <button>全キャラ</button>
+              </div>
+
+              <div className="filterGrid">
+                <label>開始週
+                  <select>
+                    <option>現在の選択内容</option>
+                  </select>
+                </label>
+                <label>終了週
+                  <select>
+                    <option>現在の選択内容</option>
+                  </select>
+                </label>
+                <label>サーバー
+                  <select>
+                    <option>全てのサーバー</option>
+                  </select>
+                </label>
+                <label>キャラクター
+                  <select>
+                    <option>全てのキャラクター</option>
+                    {state.characters.map((c) => <option key={c.id}>{c.name}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div className="totalReportBox">
+              <span>選択中の合計収益</span>
+              <strong>{yen(totalIncome)}</strong>
+              <em>({Math.round(totalIncome).toLocaleString()} メル)</em>
+              <div className="reportPills">
+                <b>全期間</b>
+                <b>全キャラ</b>
+                <b>{totalSold} 個</b>
+              </div>
+            </div>
+          </section>
+
+          <h3 className="reportSectionTitle">キャラクター別収支</h3>
+          <section className="characterRevenueGrid">
+            {statRows.map((row, index) => (
+              <div className="characterRevenueCard" key={row.character.id}>
+                <div className="revenueRank">{index + 1}</div>
+                <div className="revenueAvatar">{row.character.name.slice(0, 2)}</div>
+                <div className="revenueInfo">
+                  <div className="revenueName">
+                    <b>{row.character.name}</b>
+                    <span>未設定</span>
+                  </div>
+                  <div className="revenueBar">
+                    <i style={{ width: `${Math.max(2, (row.income / maxCharacterIncome) * 100)}%` }} />
+                  </div>
+                </div>
+                <div className="revenueMoney">{yen(row.income)}</div>
               </div>
             ))}
-          </div>
+          </section>
+
+          <section className="monthlyPanel">
+            <div className="monthlyHeader">
+              <h3>月別収支（メインル週基準）</h3>
+              <div className="legend">
+                <span><i className="greenDot" /> 精算済</span>
+                <span><i className="yellowDot" /> 一部未精算</span>
+                <span><i className="redDot" /> 未精算</span>
+                <span><i className="grayDot" /> 予定</span>
+              </div>
+            </div>
+
+            <div className="monthCards">
+              <div className="monthReportCard muted">
+                <div className="monthBadge">今週</div>
+                <div>
+                  <b>現在選択</b>
+                  <small>{totalSold}個の結晶</small>
+                </div>
+                <strong>{yen(totalIncome)}</strong>
+                <div className="weekDots"><i /><i /><i /><i /></div>
+              </div>
+              <div className="monthReportCard">
+                <div className="monthBadge orange">4週分</div>
+                <div>
+                  <b>4週換算</b>
+                  <small>現在の選択 × 4</small>
+                </div>
+                <strong>{yen(estimatedMonth4)}</strong>
+                <div className="weekDots yellow"><i /><i /><i /><i /></div>
+              </div>
+              <div className="monthReportCard">
+                <div className="monthBadge orange">5週分</div>
+                <div>
+                  <b>5週換算</b>
+                  <small>現在の選択 × 5</small>
+                </div>
+                <strong>{yen(estimatedMonth5)}</strong>
+                <div className="weekDots yellow"><i /><i /><i /><i /><i /></div>
+              </div>
+            </div>
+          </section>
+
+          <section className="settlementHistory">
+            <h3>期間内の精算履歴</h3>
+            {(state.settlements || []).length === 0 ? (
+              <div className="emptyHistory">
+                まだ精算履歴がありません。上部の「精算を実行する」を押すと、現在選択中の内容が履歴に残ります。
+              </div>
+            ) : (
+              <div className="historyRows">
+                {(state.settlements || []).map((settlement) => (
+                  <div className="settlementRow" key={settlement.id}>
+                    <div className="settlementIcon">◷</div>
+                    <div className="settlementMain">
+                      <b>{formatDateTime(settlement.createdAt)}</b>
+                      <span>
+                        {settlement.characterSummaries.map((c) => c.name).join("、")} ・ {settlement.totalCrystals}個の結晶
+                      </span>
+                    </div>
+                    <div className="settlementIncome">
+                      <small>収益</small>
+                      <strong>{yen(settlement.totalIncome)}</strong>
+                    </div>
+                    <button className="deleteSettlement" onClick={() => updateState((s) => ({ ...s, settlements: (s.settlements || []).filter((x) => x.id !== settlement.id) }))}>削除</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </main>
       )}
 

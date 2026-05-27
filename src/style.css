@@ -183,3 +183,88 @@ input[type=checkbox]{width:19px;height:19px;min-height:19px;accent-color:#2563eb
 .priceGrid{display:grid;gap:8px;max-height:420px;overflow:auto}
 .priceRow{display:grid;grid-template-columns:70px 1.4fr .8fr 1fr;gap:8px}
 @media(max-width:1000px){.reportFilterCard{grid-template-columns:1fr}.rankGrid{grid-template-columns:1fr}.monthGrid{grid-template-columns:1fr}.historyRow{grid-template-columns:44px 1fr}.historyMoney{grid-column:1/-1;text-align:left}.priceRow{grid-template-columns:60px 1fr}.priceRow input:nth-child(4){grid-column:1/-1}}
+
+.vipRankSelect{width:auto;min-width:170px;border-radius:8px;background:#fff;border:1px solid var(--line);font-size:12px;font-weight:900;color:#475569;min-height:32px;padding:6px 9px}
+.partyLine{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:7px;border-top:1px solid #eef2f7;color:#94a3b8;font-size:11px;font-weight:900}
+.partyLine select{width:74px;min-height:26px;padding:3px 6px;border-radius:7px;font-size:12px}
+.pickerActions button{min-height:34px}
+.bossCardTop{grid-template-columns:24px 1fr auto}
+.selectBossCard{min-height:78px}
+.bossTitleWrap strong{font-size:14px}
+.vipToggle{font-weight:950}
+@media(max-width:860px){.vipRankSelect{width:100%}.pickerActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pickerSearch{grid-column:1/-1}}
+
+/* fixed statistics report */
+.reportPage{padding:10px 12px 48px}
+.reportPageTitle{display:flex;align-items:center;gap:10px;margin:10px 0 24px;color:#334155}
+.reportPageTitle h2{font-size:30px;line-height:1;margin:0;font-weight:950;letter-spacing:.02em}
+.hamburger{color:#fb923c;font-size:22px}
+.reportHero{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:28px 30px;display:grid;grid-template-columns:1.2fr 520px;gap:26px;align-items:center}
+.quickShow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:24px;color:#94a3b8;font-weight:950}
+.quickShow button{min-width:70px;box-shadow:none;background:#fff}
+.quickShow button.active{background:#fff7ed;color:#ea580c;border-color:#fed7aa}
+.filterGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.filterGrid label{display:grid;gap:8px;color:#94a3b8;font-size:13px;font-weight:950}
+.filterGrid select{min-height:46px;background:#fbfcfe}
+.totalReportBox{background:#fbfdff;border:1px solid var(--line);border-radius:28px;min-height:210px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:inset 0 0 0 1px rgba(15,23,42,.01)}
+.totalReportBox span{color:#fb923c;font-size:12px;font-weight:950;letter-spacing:.04em}
+.totalReportBox strong{display:block;color:#2563eb;font-size:48px;letter-spacing:-.06em;margin:8px 0 2px;font-weight:950}
+.totalReportBox em{font-style:normal;color:#94a3b8;font-weight:900;margin-bottom:18px}
+.reportPills{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.reportPills b{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:#fff;color:#64748b;font-size:12px}
+.reportSectionTitle{font-size:24px;color:#334155;margin:30px 0 16px;font-weight:950}
+.characterRevenueGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.characterRevenueCard{background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);padding:16px 18px;display:grid;grid-template-columns:42px 56px 1fr auto;gap:14px;align-items:center;min-height:90px}
+.revenueRank{font-size:24px;font-weight:950;color:#d1d5db}
+.revenueAvatar{width:52px;height:52px;border-radius:12px;background:#f8fafc;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-weight:950}
+.revenueName{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.revenueName b{font-size:18px;color:#334155}
+.revenueName span{font-size:12px;background:#f1f5f9;border:1px solid #e5e7eb;color:#64748b;border-radius:6px;padding:3px 7px;font-weight:900}
+.revenueBar{height:8px;background:#eef2f7;border-radius:999px;overflow:hidden}
+.revenueBar i{display:block;height:100%;background:#3b82f6;border-radius:999px}
+.revenueMoney{font-size:19px;color:#2563eb;font-weight:950;white-space:nowrap}
+.monthlyPanel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);margin-top:30px;padding:22px}
+.monthlyHeader{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+.monthlyHeader h3{font-size:24px;margin:0;color:#334155}
+.legend{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fbfcfe;border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:#94a3b8;font-size:12px;font-weight:900}
+.legend i,.weekDots i{display:inline-block;width:9px;height:9px;border-radius:50%;background:#d1d5db}
+.greenDot{background:#10b981!important}.yellowDot{background:#f59e0b!important}.redDot{background:#ef4444!important}.grayDot{background:#d1d5db!important}
+.monthCards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.monthReportCard{background:#fbfcfe;border:1px solid var(--line);border-radius:13px;padding:18px;display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:start}
+.monthBadge{width:52px;height:52px;border-radius:13px;background:#f1f5f9;color:#94a3b8;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:950;font-size:12px}
+.monthBadge.orange{background:#fff7ed;color:#fb923c;border:1px solid #fed7aa}
+.monthReportCard b{display:block;color:#fb923c;margin-bottom:4px}
+.monthReportCard small{display:block;color:#94a3b8;font-weight:900}
+.monthReportCard strong{grid-column:1/-1;color:#2563eb;font-size:22px;text-align:right}
+.weekDots{grid-column:1/-1;display:flex;gap:9px;margin-top:8px}
+.weekDots.yellow i{background:#f59e0b}
+.settlementHistory{margin-top:34px}
+.settlementHistory h3{font-size:24px;color:#334155;margin:0 0 16px}
+.emptyHistory{background:#fff;border:1px dashed #cbd5e1;border-radius:13px;padding:22px;color:#94a3b8;font-weight:900;text-align:center}
+.historyRows{display:grid;gap:14px}
+.settlementRow{background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);padding:17px;display:grid;grid-template-columns:44px 1fr 260px 72px;gap:16px;align-items:center}
+.settlementIcon{width:40px;height:40px;border-radius:50%;background:#eff6ff;color:#3b82f6;display:flex;align-items:center;justify-content:center;font-weight:950}
+.settlementMain b{display:block;color:#334155;font-size:17px}
+.settlementMain span{display:block;color:#94a3b8;font-weight:900;margin-top:4px}
+.settlementIncome{text-align:right}
+.settlementIncome small{display:block;color:#94a3b8;font-weight:900}
+.settlementIncome strong{display:block;color:#2563eb;font-size:22px;margin-top:4px}
+.deleteSettlement{background:#fff;border:1px solid #fee2e2;color:#ef4444;box-shadow:none}
+@media(max-width:1100px){
+  .reportHero{grid-template-columns:1fr}
+  .characterRevenueGrid{grid-template-columns:1fr}
+  .monthCards{grid-template-columns:1fr}
+  .settlementRow{grid-template-columns:44px 1fr}
+  .settlementIncome{text-align:left;grid-column:1/-1}
+  .deleteSettlement{grid-column:1/-1}
+}
+@media(max-width:760px){
+  .reportPage{padding:8px 0 32px}
+  .reportHero{padding:16px}
+  .filterGrid{grid-template-columns:1fr}
+  .totalReportBox strong{font-size:32px}
+  .characterRevenueCard{grid-template-columns:32px 48px 1fr}
+  .revenueMoney{grid-column:1/-1;text-align:right}
+  .monthlyHeader{display:block}
+  .legend{margin-top:10px}
+}
