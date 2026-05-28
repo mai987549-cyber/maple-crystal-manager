@@ -1,11 +1,10 @@
 {
-  "name": "ボス結晶管理",
-  "short_name": "ボス結晶管理",
+  "name": "Maple Manager Sync",
+  "short_name": "Maple",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f6f7fb",
-  "theme_color": "#2563eb",
-  "orientation": "portrait-primary",
+  "background_color": "#f5efdd",
+  "theme_color": "#0b1530",
   "icons": [
     {
       "src": "/icon.svg",
