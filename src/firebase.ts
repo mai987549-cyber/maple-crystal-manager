@@ -6,5 +6,5 @@ export const firebaseReady=Boolean(firebaseConfig.apiKey&&firebaseConfig.project
 export const app=firebaseReady?initializeApp(firebaseConfig):null;
 export const auth=app?getAuth(app):null;
 export const db=app?getFirestore(app):null;
-export async function loginWithGoogle(){if(!auth)throw new Error("Firebase config is missing");await signInWithPopup(auth,new GoogleAuthProvider())}
+export async function loginWithGoogle(){if(!auth)throw new Error("Firebase config missing");await signInWithPopup(auth,new GoogleAuthProvider())}
 export async function logout(){if(auth)await signOut(auth)}
